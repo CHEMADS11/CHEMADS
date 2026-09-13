@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Dashboard - CHEMADS</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://razorpay.com"></script>
+</head>
+<body>
+    <header>
+        <div class="logo">CHEMADS Dashboard</div>
+        <button onclick="logout()" class="btn" style="background:#cc0000;">Logout</button>
+    </header>
+
+    <div class="container">
+        <h2>📚 Free Resources</h2>
+        <div class="grid" style="margin-bottom: 40px;">
+            <div class="card"><h3>Study Material (PDF)</h3><a href="#" class="btn" style="margin-top:10px; display:inline-block;">Download</a></div>
+            <div class="card"><h3>Video Lectures</h3><a href="#" class="btn" style="margin-top:10px; display:inline-block;">Watch</a></div>
+            <div class="card"><h3>Topic Quizzes</h3><a href="#" class="btn" style="margin-top:10px; display:inline-block;">Attempt</a></div>
+        </div>
+
+        <h2>📝 JEE MAINS 2027 Test Series (NTA Pattern)</h2>
+        <div style="background:#fff; padding:15px; margin-bottom:20px; border-radius:8px;" id="premium-banner">
+            <strong>Unlock All 50 Premium CBT Tests for just ₹199!</strong> 
+            <button onclick="payNow()" class="btn" style="margin-left:15px;">Buy Now</button>
+        </div>
+        
+        <div class="grid" id="test-list"></div>
+    </div>
+
+    <script>
+        const isPaid = localStorage.getItem('isPaid') === 'true';
+        if(!isPaid) { document.getElementById('premium-banner').style.display = 'block'; }
+        else { document.getElementById('premium-banner').innerHTML = "✨ You have unlocked all Premium Tests!"; }
+
+        const testList = document.getElementById('test-list');
+        for (let i = 1; i <= 50; i++) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            const isLocked = i > 1 && !isPaid;
+            
+            card.innerHTML = `
+                <h3>JEE Main Mock Test ${i}</h3>
+                <p>Pattern: NTA 2027</p>
+                <p style="color:${isLocked ? 'red' : 'green'}">${isLocked ? '🔒 Paid' : '🔓 Accessible'}</p>
+                <button onclick="startTest(${i}, ${isLocked})" class="btn" style="margin-top:10px; background:${isLocked ? '#aaa' : '#00A4E4'}">
+                    ${isLocked ? 'Unlock' : 'Start Test'}
+                </button>
+            `;
+            testList.appendChild(card);
+        }
+
+        function startTest(id, isLocked) {
+            if(isLocked) { alert('Please purchase the test series to unlock this test.'); return; }
+            window.location.href = `cbt.html?testId=${id}`;
+        }
+
+        async function payNow() {
+            const res = await fetch('/api/create-order', { method: 'POST' });
+            const order = await res.json();
+            
+            var options = {
+                "key": "rzp_test_YOUR_KEY_HERE",
+                "amount": order.amount,
+                "currency": "INR",
+                "name": "CHEMADS",
+                "description": "JEE Mains 2027 50 Test Series",
+                "order_id": order.id,
+                "handler": async function (response){
+                    await fetch('/api/verify-payment', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ email: localStorage.getItem('userEmail') })
+                    });
+                    localStorage.setItem('isPaid', 'true');
+                    alert('Payment Successful! All tests unlocked.');
+                    window.location.reload();
+                }
+            };
+            var rzp1 = new Razorpay(options);
+            rzp1.open();
+        }
+        function logout() { localStorage.clear(); window.location.href = 'index.html'; }
+    </script>
+</body>
+</html>

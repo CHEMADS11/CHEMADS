@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NTA CBT Exam Panel</title>
+    <style>
+        body { font-family: Arial; margin: 0; background: #f1f3f5; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .cbt-header { background: #214a72; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+        .question-area { flex: 3; background: white; padding: 25px; display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; }
+        .sidebar-palette { flex: 1; background: #e5edf5; border-left: 2px solid #ccc; padding: 15px; display: flex; flex-direction: column; justify-content: space-between; }
+        .palette-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 15px; }
+        .btn-p { width: 40px; height: 40px; border-radius: 4px; border: 1px solid #999; background: #fff; cursor: pointer; font-weight: bold; }
+        .answered { background: #27ae60 !important; color: white; border-radius: 0 0 50% 50%; }
+        .not-answered { background: #e74c3c !important; color: white; border-radius: 50% 50% 0 0; }
+        .review { background: #8e44ad !important; color: white; border-radius: 50%; }
+        .cbt-footer { background: #f1f3f5; padding: 15px; border-top: 1px solid #ccc; display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="cbt-header">
+        <div id="exam-title">CHEMADS Mock Test Series</div>
+        <div>Time Left: <span id="timer" style="font-weight: bold; font-size: 16px;">180:00</span></div>
+    </div>
+
+    <div class="main-container" id="exam-view">
+        <div class="question-area">
+            <div>
+                <h3 id="q-num">Question 1</h3>
+                <hr><br>
+                <p id="q-text" style="font-size: 18px; margin-bottom: 20px;"></p>
+                <div id="options-container"></div>
+            </div>
+            <div class="cbt-footer">
+                <button class="btn-p" style="width:auto; padding:0 15px; background:#fff;" onclick="saveAndNext()">Save & Next</button>
+                <button class="btn-p" style="width:auto; padding:0 15px; background:#f39c12; color:white;" onclick="markForReview()">Mark for Review</button>
+                <button class="btn-p" style="width:auto; padding:0 15px; background:#e74c3c; color:white;" onclick="clearResponse()">Clear Response</button>
+                <button class="btn-p" style="width:auto; padding:0 15px; background:#27ae60; color:white; margin-left:auto;" onclick="submitExam()">Submit Test</button>
+            </div>
+        </div>
+
+        <div class="sidebar-palette">
+            <div>
+                <h4>Question Palette</h4>
+                <div class="palette-grid" id="palette-box"></div>
+            </div>
+            <div style="font-size:12px; line-height:2;">
+                🟢 Answered &nbsp; 🔴 Not Answered &nbsp; 🟣 Review
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="result-view" style="display:none; max-width:800px; background:white; padding:30px; border-radius:8px; margin-top:50px; overflow-y:auto; height:85vh;">
+        <h2>Performance Scorecard</h2>
+        <h1 id="score-display" style="color:#00A4E4; margin:20px 0;">Score: 0 / 12</h1>
+        <hr><br>
+        <h3>Detailed Explanations & Solutions</h3>
+        <div id="solutions-box"></div>
+        <br><a href="dashboard.html" class="btn">Return to Dashboard</a>
+    </div>
+
+    <script>
+        // Sample 3-question array layout (Expand up to 90 items for your custom tests)
+        const sampleQuestions = [
+            { q: "What is the oxidation state of Cr in K2Cr2O7?", options: ["+3", "+6", "+5", "+2"], ans: 1, sol: "In K2Cr2O7: 2(+1) + 2(x) + 7(-2) = 0 => 2 + 2x - 14 = 0 => 2x = 12 => x = +6." },
+            { q: "Which of the following has the highest boiling point?", options: ["HF", "HCl", "HBr", "HI"], ans: 0, sol: "HF forms exceptionally strong intermolecular Hydrogen bonding, giving it the highest boiling point." },
+            { q: "The hybridisation of Cl in ClF3 is:", options: ["sp3", "sp3d", "sp3d2", "sp2"], ans: 1, sol: "ClF3 has 3 bond pairs and 2 lone pairs. Steric number = 5, which corresponds to sp3d hybridisation." }
+        ];
+
+        let currentIdx = 0;
+        let userResponses = Array(sampleQuestions.length).fill(null);
+        let statusTracking = Array(sampleQuestions.length).fill('not-visited'); // answered, review, skipped
+
+        function loadQuestion(idx) {
+            currentIdx = idx;
+            document.getElementById('q-num').innerText = `Question ${idx + 1}`;
+            document.getElementById('q-text').innerText = sampleQuestions[idx].q;
+            
+            const optBox = document.getElementById('options-container');
+            optBox.innerHTML = '';
+            sampleQuestions[idx].options.forEach((opt, oIdx) => {
+                optBox.innerHTML += `
+                    <label style="display:block; margin:12px 0; font-size:16px; cursor:pointer;">
+                        <input type="radio" name="q-opt" value="${oIdx}" ${userResponses[idx] == oIdx ? 'checked' : ''}> ${opt}
+                    </label>
+                `;
+            });
+            renderPalette();
+        }
+
+        function renderPalette() {
+            const pBox = document.getElementById('palette-box');
+            pBox.innerHTML = '';
+            sampleQuestions.forEach((_, idx) => {
+                let statusClass = '';
+                if(statusTracking[idx] === 'answered') statusClass = 'answered';
+                else if(statusTracking[idx] === 'review') statusClass = 'review';
+                else if(statusTracking[idx] === 'skipped') statusClass = 'not-answered';
+
+                pBox.innerHTML += `<button class="btn-p ${statusClass}" onclick="loadQuestion(${idx})">${idx + 1}</button>`;
+            });
+        }
+
+        function saveAndNext() {
+            const selected = document.querySelector('input[name="q-opt"]:checked');
+            if(selected) {
+                userResponses[currentIdx] = parseInt(selected.value);
+                statusTracking[currentIdx] = 'answered';
+            } else {
+                statusTracking[currentIdx] = 'skipped';
+            }
+            if(currentIdx < sampleQuestions.length - 1) loadQuestion(currentIdx + 1);
+            else renderPalette();
+        }
+
+        function markForReview() {
+            statusTracking[currentIdx] = 'review';
+            if(currentIdx < sampleQuestions.length - 1) loadQuestion(currentIdx + 1);
+            else renderPalette();
+        }
+
+        function clearResponse() {
+            userResponses[currentIdx] = null;
+            statusTracking[currentIdx] = 'skipped';
+            loadQuestion(currentIdx);
+        }
+
+        function submitExam() {
+            if(!confirm("Are you sure you want to finish and submit the test?")) return;
+            
+            let score = 0;
+            const solBox = document.getElementById('solutions-box');
+            solBox.innerHTML = '';
+
+            sampleQuestions.forEach((question, idx) => {
+                let userAnsText = "Not Attempted";
+                let points = 0;
+                
+                if(userResponses[idx] !== null) {
+                    userAnsText = question.options[userResponses[idx]];
+                    if(userResponses[idx] === question.ans) {
+                        points = 4; // NTA Marking Scheme (+4)
+                        score += 4;
+                    } else {
+                        points = -1; // NTA Marking Scheme (-1)
+                        score -= 1;
+                    }
+                }
+
+                solBox.innerHTML += `
+                    <div style="margin:20px 0; padding:15px; border-left:4px solid ${points === 4 ? 'green' : points === -1 ? 'red' : '#777'}; background:#fafafa;">
+                        <strong>Q${idx+1}: ${question.q}</strong><br>
+                        <p>Your Answer: <span style="color:${points === 4 ? 'green' : 'red'}">${userAnsText}</span></p>
+                        <p style="color:green">Correct Answer: ${question.options[question.ans]}</p>
+                        <p style="margin-top:8px; font-style:italic; color:#555;"><strong>Solution:</strong> ${question.sol}</p>
+                    </div>
+                `;
+            });
+
+            document.getElementById('exam-view').style.display = 'none';
+            document.getElementById('timer').parentElement.style.display = 'none';
+            document.getElementById('score-display').innerText = `Total Score: ${score} Marks`;
+            document.getElementById('result-view').style.display = 'block';
+        }
+
+        // 3-Hour Countdown timer simulation
+        let totalSecs = 180 * 60;
+        setInterval(() => {
+            if(totalSecs <= 0) return submitExam();
+            totalSecs--;
+            let mins = Math.floor(totalSecs / 60);
+            let secs = totalSecs % 60;
+            document.getElementById('timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }, 1000);
+
+        // Initial launch
+        loadQuestion(0);
+    </script>
+</body>
+</html>
